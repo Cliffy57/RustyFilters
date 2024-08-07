@@ -1,0 +1,9 @@
+[package]
+name = "rust_image_filter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+image = "0.23"
+iced = "0.3"
+rand = "0.8"
