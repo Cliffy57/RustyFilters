@@ -1,18 +1,19 @@
 use log::{info, error};
 use iced::{
     Alignment, Element, Length, Sandbox, Settings,
-    widget::Button,
+    widget::{Button, Column, Container, Image},
 };
-use iced::widget::{Column, Container};
-
+use iced::widget::image::Handle;
 use native_dialog::FileDialog;
 use std::path::PathBuf;
+use std::fs;
 
 use crate::image_processing;
 
 pub struct ImageFilterApp {
     input_path: Option<PathBuf>,
     output_path: Option<PathBuf>,
+    image_handle: Option<Handle>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +27,7 @@ impl Sandbox for ImageFilterApp {
         ImageFilterApp {
             input_path: None,
             output_path: None,
+            image_handle: None,
         }
     }
 
@@ -45,6 +47,13 @@ impl Sandbox for ImageFilterApp {
                         info!("File selected: {:?}", path);
                         self.input_path = Some(path.clone());
                         self.output_path = None;
+
+                        // Load the image and create a handle
+                        if let Ok(image_data) = fs::read(&path) {
+                            self.image_handle = Some(Handle::from_memory(image_data));
+                        } else {
+                            error!("Failed to read image file");
+                        }
                     } else {
                         info!("No file selected");
                     }
@@ -76,17 +85,22 @@ impl Sandbox for ImageFilterApp {
         let select_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Select Image")
             .on_press(Message::SelectImage);
         
-        // Column to hold the buttons
+        // Column to hold the buttons and image
         let mut content = Column::new()
             .spacing(20)
             .align_items(Alignment::Center)
             .push(select_button);
     
-        // Conditionally push the ProcessImage button if an image is selected
-        if self.input_path.is_some() {
+        // Conditionally push the ProcessImage button and image if an image is selected
+        if let Some(ref image_handle) = self.image_handle {
             let process_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Apply Filters")
                 .on_press(Message::ProcessImage);
-            content = content.push(process_button);
+            
+            let image_widget = Image::new(image_handle.clone())
+                .width(Length::Fixed(300.0))
+                .height(Length::Fixed(300.0));
+            
+            content = content.push(image_widget).push(process_button);
         }
     
         // Build and return the UI container
@@ -96,7 +110,7 @@ impl Sandbox for ImageFilterApp {
             .center_x()
             .center_y()
             .into()
-    }    
+    }
 
     fn theme(&self) -> iced::Theme {
         iced::Theme::default()
@@ -118,7 +132,8 @@ impl Sandbox for ImageFilterApp {
     }
     
     type Message = Message;
-}  
+}
+
 use env_logger::Env;
 pub fn run() -> iced::Result {
     let env = Env::default()
