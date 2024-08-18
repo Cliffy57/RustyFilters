@@ -14,6 +14,7 @@ pub struct ImageFilterApp {
     input_path: Option<PathBuf>,
     output_path: Option<PathBuf>,
     image_handle: Option<Handle>,
+    filtered_image_handle: Option<Handle>,
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +29,7 @@ impl Sandbox for ImageFilterApp {
             input_path: None,
             output_path: None,
             image_handle: None,
+            filtered_image_handle: None,
         }
     }
 
@@ -51,6 +53,7 @@ impl Sandbox for ImageFilterApp {
                         // Load the image and create a handle
                         if let Ok(image_data) = fs::read(&path) {
                             self.image_handle = Some(Handle::from_memory(image_data));
+                            self.filtered_image_handle = None; // Reset filtered image handle
                         } else {
                             error!("Failed to read image file");
                         }
@@ -69,7 +72,14 @@ impl Sandbox for ImageFilterApp {
                     info!("Output path: {:?}", output_path);
                     if image_processing::apply_filter(input_path, &output_path).is_ok() {
                         info!("Image processing completed successfully");
-                        self.output_path = Some(output_path);
+                        self.output_path = Some(output_path.clone());
+
+                        // Load the filtered image and create a handle
+                        if let Ok(image_data) = fs::read(&output_path) {
+                            self.filtered_image_handle = Some(Handle::from_memory(image_data));
+                        } else {
+                            error!("Failed to read filtered image file");
+                        }
                     } else {
                         error!("Error processing image");
                     }
@@ -84,25 +94,36 @@ impl Sandbox for ImageFilterApp {
         // Button to select an image
         let select_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Select Image")
             .on_press(Message::SelectImage);
-        
-        // Column to hold the buttons and image
+
+        // Column to hold the buttons and image previews
         let mut content = Column::new()
             .spacing(20)
             .align_items(Alignment::Center)
             .push(select_button);
-    
-        // Conditionally push the ProcessImage button and image if an image is selected
+
+        // Display the original image preview if available
         if let Some(ref image_handle) = self.image_handle {
-            let process_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Apply Filters")
-                .on_press(Message::ProcessImage);
-            
             let image_widget = Image::new(image_handle.clone())
                 .width(Length::Fixed(300.0))
                 .height(Length::Fixed(300.0));
-            
-            content = content.push(image_widget).push(process_button);
+            content = content.push(image_widget);
         }
-    
+
+        // Conditionally push the ProcessImage button if an image is selected
+        if self.input_path.is_some() {
+            let process_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Apply Filters")
+                .on_press(Message::ProcessImage);
+            content = content.push(process_button);
+        }
+
+        // Display the filtered image preview if available
+        if let Some(ref filtered_image_handle) = self.filtered_image_handle {
+            let filtered_image_widget = Image::new(filtered_image_handle.clone())
+                .width(Length::Fixed(300.0))
+                .height(Length::Fixed(300.0));
+            content = content.push(filtered_image_widget);
+        }
+
         // Build and return the UI container
         Container::new(content)
             .width(Length::Fill)
