@@ -72,26 +72,31 @@ impl Sandbox for ImageFilterApp {
     }
 
     fn view(&self) -> Element<Message> {
+        // Button to select an image
         let select_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Select Image")
             .on_press(Message::SelectImage);
-        // Button to apply filters
-        let process_button:  Button<Message, iced::Theme, iced::Renderer>  = Button::new("Apply Filters")
-            .on_press(Message::ProcessImage);
-
-
-        let content = Column::new()
+        
+        // Column to hold the buttons
+        let mut content = Column::new()
             .spacing(20)
             .align_items(Alignment::Center)
             .push(select_button);
-
-
+    
+        // Conditionally push the ProcessImage button if an image is selected
+        if self.input_path.is_some() {
+            let process_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Apply Filters")
+                .on_press(Message::ProcessImage);
+            content = content.push(process_button);
+        }
+    
+        // Build and return the UI container
         Container::new(content)
             .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
             .center_y()
             .into()
-    }
+    }    
 
     fn theme(&self) -> iced::Theme {
         iced::Theme::default()
