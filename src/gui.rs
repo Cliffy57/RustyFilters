@@ -53,7 +53,18 @@ impl Sandbox for ImageFilterApp {
                         // Load the image and create a handle
                         if let Ok(image_data) = fs::read(&path) {
                             self.image_handle = Some(Handle::from_memory(image_data));
-                            self.filtered_image_handle = None; // Reset filtered image handle
+
+                            // Apply the filter immediately for preview
+                            let output_path = path.with_file_name("output_preview.png");
+                            if image_processing::apply_filter(&path, &output_path).is_ok() {
+                                if let Ok(filtered_image_data) = fs::read(&output_path) {
+                                    self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
+                                } else {
+                                    error!("Failed to read filtered image file");
+                                }
+                            } else {
+                                error!("Error processing image");
+                            }
                         } else {
                             error!("Failed to read image file");
                         }
@@ -65,26 +76,14 @@ impl Sandbox for ImageFilterApp {
                 }
             }
             Message::ProcessImage => {
-                info!("Process Image button clicked");
-                if let Some(input_path) = &self.input_path {
+                if let Some(ref input_path) = self.input_path {
                     let output_path = input_path.with_file_name("output.png");
-                    info!("Processing image: {:?}", input_path);
-                    info!("Output path: {:?}", output_path);
                     if image_processing::apply_filter(input_path, &output_path).is_ok() {
-                        info!("Image processing completed successfully");
-                        self.output_path = Some(output_path.clone());
-
-                        // Load the filtered image and create a handle
-                        if let Ok(image_data) = fs::read(&output_path) {
-                            self.filtered_image_handle = Some(Handle::from_memory(image_data));
-                        } else {
-                            error!("Failed to read filtered image file");
-                        }
+                        self.output_path = Some(output_path);
+                        info!("Image processed and saved");
                     } else {
                         error!("Error processing image");
                     }
-                } else {
-                    error!("No input image selected");
                 }
             }
         }
@@ -94,6 +93,10 @@ impl Sandbox for ImageFilterApp {
         // Button to select an image
         let select_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Select Image")
             .on_press(Message::SelectImage);
+
+        // Button to apply the filter and save the output
+        let apply_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Apply Filter")
+            .on_press(Message::ProcessImage);
 
         // Column to hold the buttons and image previews
         let mut content = Column::new()
@@ -109,19 +112,14 @@ impl Sandbox for ImageFilterApp {
             content = content.push(image_widget);
         }
 
-        // Conditionally push the ProcessImage button if an image is selected
-        if self.input_path.is_some() {
-            let process_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Apply Filters")
-                .on_press(Message::ProcessImage);
-            content = content.push(process_button);
-        }
-
         // Display the filtered image preview if available
         if let Some(ref filtered_image_handle) = self.filtered_image_handle {
             let filtered_image_widget = Image::new(filtered_image_handle.clone())
                 .width(Length::Fixed(300.0))
                 .height(Length::Fixed(300.0));
             content = content.push(filtered_image_widget);
+            // Add the apply button only if there is a filtered image preview
+            content = content.push(apply_button);
         }
 
         // Build and return the UI container
