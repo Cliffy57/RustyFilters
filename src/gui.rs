@@ -1,4 +1,4 @@
-use log::{info, error};
+use log::{info, error}; // Import logging macros
 use iced::{
     Alignment, Element, Length, Sandbox, Settings,
     widget::{Button, Column, Container, Image},
@@ -6,24 +6,28 @@ use iced::{
 use iced::widget::image::Handle;
 use native_dialog::FileDialog;
 use std::path::PathBuf;
-use std::fs;
+use std::fs; // Import fs module for file operations
 
-use crate::image_processing;
+use crate::image_processing; // Import custom image processing module
 
+// Define the main application structure
 pub struct ImageFilterApp {
-    input_path: Option<PathBuf>,
-    output_path: Option<PathBuf>,
-    image_handle: Option<Handle>,
-    filtered_image_handle: Option<Handle>,
+    input_path: Option<PathBuf>, // Path to the input image
+    output_path: Option<PathBuf>, // Path to the output image
+    image_handle: Option<Handle>, // Handle for the original image
+    filtered_image_handle: Option<Handle>, // Handle for the filtered image
 }
 
+// Define the messages that the application can handle
 #[derive(Debug, Clone)]
 pub enum Message {
-    SelectImage,
-    ProcessImage,
+    SelectImage, // Message for selecting an image
+    ProcessImage, // Message for processing the image
 }
 
+// Implement the Sandbox trait for the application
 impl Sandbox for ImageFilterApp {
+    // Initialize the application state
     fn new() -> Self {
         ImageFilterApp {
             input_path: None,
@@ -33,14 +37,17 @@ impl Sandbox for ImageFilterApp {
         }
     }
 
+    // Set the application title
     fn title(&self) -> String {
         String::from("RustyFilters")
     }
 
+    // Handle messages and update the application state
     fn update(&mut self, message: Message) {
         match message {
             Message::SelectImage => {
                 info!("Select Image button clicked");
+                // Open file dialog to select an image
                 if let Ok(path) = FileDialog::new()
                     .add_filter("Image Files", &["png", "jpg", "jpeg"])
                     .show_open_single_file()
@@ -76,6 +83,7 @@ impl Sandbox for ImageFilterApp {
                 }
             }
             Message::ProcessImage => {
+                // Apply the filter and save the output image
                 if let Some(ref input_path) = self.input_path {
                     let output_path = input_path.with_file_name("output.png");
                     if image_processing::apply_filter(input_path, &output_path).is_ok() {
@@ -89,6 +97,7 @@ impl Sandbox for ImageFilterApp {
         }
     }
 
+    // Build the user interface
     fn view(&self) -> Element<Message> {
         // Button to select an image
         let select_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Select Image")
@@ -131,18 +140,22 @@ impl Sandbox for ImageFilterApp {
             .into()
     }
 
+    // Set the application theme
     fn theme(&self) -> iced::Theme {
         iced::Theme::default()
     }
 
+    // Set the application style
     fn style(&self) -> iced::theme::Application {
         iced::theme::Application::default()
     }
 
+    // Set the scale factor for the application
     fn scale_factor(&self) -> f64 {
         1.0
     }
 
+    // Run the application
     fn run(settings: Settings<()>) -> Result<(), iced::Error>
     where
         Self: 'static + Sized,
@@ -153,6 +166,7 @@ impl Sandbox for ImageFilterApp {
     type Message = Message;
 }
 
+// Initialize the logger and run the application
 use env_logger::Env;
 pub fn run() -> iced::Result {
     let env = Env::default()
