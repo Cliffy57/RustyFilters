@@ -166,6 +166,21 @@ impl Sandbox for ImageFilterApp {
     type Message = Message;
 }
 
+// Implement the Drop trait for the application
+impl Drop for ImageFilterApp {
+    fn drop(&mut self) {
+        if let Some(ref input_path) = self.input_path {
+            let preview_path = input_path.with_file_name("output_preview.png");
+            if preview_path.exists() {
+                match fs::remove_file(&preview_path) {
+                    Ok(_) => info!("Preview file deleted successfully"),
+                    Err(e) => error!("Failed to delete preview file: {:?}", e),
+                }
+            }
+        }
+    }
+}
+
 // Initialize the logger and run the application
 use env_logger::Env;
 pub fn run() -> iced::Result {
