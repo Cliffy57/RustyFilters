@@ -58,22 +58,28 @@ impl Sandbox for ImageFilterApp {
                         self.output_path = None;
 
                         // Load the image and create a handle
-                        if let Ok(image_data) = fs::read(&path) {
-                            self.image_handle = Some(Handle::from_memory(image_data));
+                        match fs::read(&path) {
+                            Ok(image_data) => {
+                                self.image_handle = Some(Handle::from_memory(image_data));
 
-                            // Apply the filter immediately for preview
-                            let output_path = path.with_file_name("output_preview.png");
-                            if image_processing::apply_filter(&path, &output_path).is_ok() {
-                                if let Ok(filtered_image_data) = fs::read(&output_path) {
-                                    self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
+                                // Apply the filter immediately for preview
+                                let output_path = path.with_file_name("output_preview.png");
+                                if image_processing::apply_filter(&path, &output_path).is_ok() {
+                                    match fs::read(&output_path) {
+                                        Ok(filtered_image_data) => {
+                                            self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to read filtered image file: {:?}", e);
+                                        }
+                                    }
                                 } else {
-                                    error!("Failed to read filtered image file");
+                                    error!("Error processing image");
                                 }
-                            } else {
-                                error!("Error processing image");
                             }
-                        } else {
-                            error!("Failed to read image file");
+                            Err(e) => {
+                                error!("Failed to read image file: {:?}", e);
+                            }
                         }
                     } else {
                         info!("No file selected");
