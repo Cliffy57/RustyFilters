@@ -9,6 +9,36 @@ use std::path::PathBuf;
 use std::fs; // Import fs module for file operations
 
 use crate::image_processing; // Import custom image processing module
+use std::process::Command;
+use std::io;
+
+fn optimize_image(input_path: &PathBuf, output_path: &PathBuf) -> io::Result<()> {
+    // Create a temporary file path
+    let temp_output_path = output_path.with_extension("temp.png");
+
+    let status = Command::new("ffmpeg")
+        .args(&[
+            "-y", // Add this flag to force overwrite
+            "-i", input_path.to_str().unwrap(),
+            "-vf", "scale=iw*0.5:ih*0.5", // Example: scale down by 50%
+            "-q:v", "2", // Set quality level (lower is better quality)
+            temp_output_path.to_str().unwrap(),
+        ])
+        .status()?;
+    
+    // Info about the ffmpeg command status
+    info!("ffmpeg command status: {}", status);
+    
+    if status.success() {
+        // Replace the original file with the temporary file
+        fs::rename(temp_output_path, output_path)?;
+        Ok(())
+    } else {
+        // Clean up the temporary file if the command failed
+        let _ = fs::remove_file(temp_output_path);
+        Err(io::Error::new(io::ErrorKind::Other, "ffmpeg command failed"))
+    }
+}
 
 // Define the main application structure
 pub struct ImageFilterApp {
@@ -93,8 +123,13 @@ impl Sandbox for ImageFilterApp {
                 if let Some(ref input_path) = self.input_path {
                     let output_path = input_path.with_file_name("output.png");
                     if image_processing::apply_filter(input_path, &output_path).is_ok() {
-                        self.output_path = Some(output_path);
-                        info!("Image processed and saved");
+                        // Optimize the output image using ffmpeg
+                        if let Err(e) = optimize_image(&output_path, &output_path) {
+                            error!("Failed to optimize image: {:?}", e);
+                        } else {
+                            self.output_path = Some(output_path);
+                            info!("Image processed, optimized, and saved");
+                        }
                     } else {
                         error!("Error processing image");
                     }
