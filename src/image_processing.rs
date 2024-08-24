@@ -13,13 +13,13 @@ use rand::prelude::*;
 ///
 /// * `Result<(), Box<dyn std::error::Error>>` - Ok(()) if successful, or an error if something goes wrong.
 
-pub fn apply_filter<P: AsRef<Path>>(input_path: P, output_path: P) -> Result<(), Box<dyn std::error::Error>> {
+pub fn apply_filter<P: AsRef<Path>>(input_path: P, output_path: P, grain_intensity: i16) -> Result<(), Box<dyn std::error::Error>> {
     // Open the input image
     let img = image::open(input_path)?;
     let mut filtered_img = img.to_rgba8();
 
     // Apply grain effect
-    add_grain(&mut filtered_img);
+    add_grain(&mut filtered_img, grain_intensity);
 
     // Enhance colors using a more subtle technique
     let enhanced_img = enhance_colors(&filtered_img);
@@ -41,11 +41,11 @@ pub fn apply_filter<P: AsRef<Path>>(input_path: P, output_path: P) -> Result<(),
 /// # Arguments
 ///
 /// * `img` - A mutable reference to the image buffer.
-fn add_grain(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>) {
-    
+/// * `intensity` - The intensity of the grain effect.
+fn add_grain(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, intensity: i16) {
     let mut rng = rand::thread_rng();
     for pixel in img.pixels_mut() {
-        let noise: i16 = rng.gen_range(-10..=10);
+        let noise: i16 = rng.gen_range(-intensity..=intensity);
         for c in 0..3 {
             pixel[c] = ((pixel[c] as i16 + noise).max(0).min(255)) as u8;
         }
@@ -165,7 +165,7 @@ fn main() {
         return;
     }
 
-    match apply_filter(input_image_path, output_image_path) {
+    match apply_filter(input_image_path, output_image_path, 20) {
         Ok(_) => println!("Image processing completed successfully."),
         Err(e) => println!("Error processing image: {}", e),
     }

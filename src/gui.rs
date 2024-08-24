@@ -1,7 +1,7 @@
 use log::{info, error}; // Import logging macros
 use iced::{
     Alignment, Element, Length, Sandbox, Settings,
-    widget::{Button, Column, Container, Image},
+    widget::{Button, Column, Container, Image, Text, Slider},
 };
 use iced::widget::image::Handle;
 use native_dialog::FileDialog;
@@ -46,6 +46,7 @@ pub struct ImageFilterApp {
     output_path: Option<PathBuf>, // Path to the output image
     image_handle: Option<Handle>, // Handle for the original image
     filtered_image_handle: Option<Handle>, // Handle for the filtered image
+    grain_intensity: i16, // Grain intensity value
 }
 
 // Define the messages that the application can handle
@@ -53,6 +54,7 @@ pub struct ImageFilterApp {
 pub enum Message {
     SelectImage, // Message for selecting an image
     ProcessImage, // Message for processing the image
+    GrainIntensityChanged(i16), // Message for changing grain intensity
 }
 
 // Implement the Sandbox trait for the application
@@ -64,6 +66,7 @@ impl Sandbox for ImageFilterApp {
             output_path: None,
             image_handle: None,
             filtered_image_handle: None,
+            grain_intensity: 10, // Default grain intensity
         }
     }
 
@@ -94,7 +97,7 @@ impl Sandbox for ImageFilterApp {
 
                                 // Apply the filter immediately for preview
                                 let output_path = path.with_file_name("output_preview.png");
-                                if image_processing::apply_filter(&path, &output_path).is_ok() {
+                                if image_processing::apply_filter(&path, &output_path, self.grain_intensity).is_ok() {
                                     match fs::read(&output_path) {
                                         Ok(filtered_image_data) => {
                                             self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
@@ -122,13 +125,33 @@ impl Sandbox for ImageFilterApp {
                 // Apply the filter and save the output image
                 if let Some(ref input_path) = self.input_path {
                     let output_path = input_path.with_file_name("output.png");
-                    if image_processing::apply_filter(input_path, &output_path).is_ok() {
+                    if image_processing::apply_filter(input_path, &output_path, self.grain_intensity).is_ok() {
                         // Optimize the output image using ffmpeg
                         if let Err(e) = optimize_image(&output_path, &output_path) {
                             error!("Failed to optimize image: {:?}", e);
                         } else {
                             self.output_path = Some(output_path);
                             info!("Image processed, optimized, and saved");
+                        }
+                    } else {
+                        error!("Error processing image");
+                    }
+                }
+            }
+            Message::GrainIntensityChanged(intensity) => {
+                self.grain_intensity = intensity;
+                info!("Grain intensity changed to {}", intensity);
+                // Reapply the filter for preview
+                if let Some(ref input_path) = self.input_path {
+                    let output_path = input_path.with_file_name("output_preview.png");
+                    if image_processing::apply_filter(input_path, &output_path, self.grain_intensity).is_ok() {
+                        match fs::read(&output_path) {
+                            Ok(filtered_image_data) => {
+                                self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
+                            }
+                            Err(e) => {
+                                error!("Failed to read filtered image file: {:?}", e);
+                            }
                         }
                     } else {
                         error!("Error processing image");
@@ -148,11 +171,16 @@ impl Sandbox for ImageFilterApp {
         let apply_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Apply Filter")
             .on_press(Message::ProcessImage);
 
+        // Slider to control grain intensity
+        let grain_slider = Slider::new(0..=20, self.grain_intensity, Message::GrainIntensityChanged);
+
         // Column to hold the buttons and image previews
         let mut content = Column::new()
             .spacing(20)
             .align_items(Alignment::Center)
-            .push(select_button);
+            .push(select_button)
+            .push(Text::new(format!("Grain Intensity: {}", self.grain_intensity)))
+            .push(grain_slider);
 
         // Display the original image preview if available
         if let Some(ref image_handle) = self.image_handle {
