@@ -160,20 +160,19 @@ impl Sandbox for ImageFilterApp {
             }
         }
     }
-
-    // Build the user interface
-    fn view(&self) -> Element<Message> {
+    
+        fn view(&self) -> Element<Message> {
         // Button to select an image
         let select_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Select Image")
             .on_press(Message::SelectImage);
-
+    
         // Button to apply the filter and save the output
         let apply_button: Button<Message, iced::Theme, iced::Renderer> = Button::new("Apply Filter")
             .on_press(Message::ProcessImage);
-
+    
         // Slider to control grain intensity
         let grain_slider = Slider::new(0..=20, self.grain_intensity, Message::GrainIntensityChanged);
-
+    
         // Column to hold the buttons and image previews
         let mut content = Column::new()
             .spacing(20)
@@ -181,25 +180,25 @@ impl Sandbox for ImageFilterApp {
             .push(select_button)
             .push(Text::new(format!("Grain Intensity: {}", self.grain_intensity)))
             .push(grain_slider);
-
+    
         // Display the original image preview if available
         if let Some(ref image_handle) = self.image_handle {
             let image_widget = Image::new(image_handle.clone())
-                .width(Length::Fixed(300.0))
-                .height(Length::Fixed(300.0));
+                .width(Length::FillPortion(1))
+                .height(Length::FillPortion(1));
             content = content.push(image_widget);
         }
-
+    
         // Display the filtered image preview if available
         if let Some(ref filtered_image_handle) = self.filtered_image_handle {
             let filtered_image_widget = Image::new(filtered_image_handle.clone())
-                .width(Length::Fixed(300.0))
-                .height(Length::Fixed(300.0));
+                .width(Length::FillPortion(1))
+                .height(Length::FillPortion(1));
             content = content.push(filtered_image_widget);
             // Add the apply button only if there is a filtered image preview
             content = content.push(apply_button);
         }
-
+    
         // Build and return the UI container
         Container::new(content)
             .width(Length::Fill)
