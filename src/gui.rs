@@ -1,4 +1,4 @@
-use log::{info, error}; // Import logging macros
+use log::{info, error};
 use iced::{
     Alignment, Element, Length, Sandbox, Settings,
     widget::{Button, Column, Container, Image, Text, Slider, Row},
@@ -6,9 +6,9 @@ use iced::{
 use iced::widget::image::Handle;
 use native_dialog::FileDialog;
 use std::path::PathBuf;
-use std::fs; // Import fs module for file operations
+use std::fs;
 
-use crate::image_processing; // Import custom image processing module
+use crate::image_processing;
 use std::process::Command;
 use std::io;
 
@@ -42,31 +42,39 @@ fn optimize_image(input_path: &PathBuf, output_path: &PathBuf) -> io::Result<()>
 
 // Define the main application structure
 pub struct ImageFilterApp {
-    input_path: Option<PathBuf>, // Path to the input image
-    output_path: Option<PathBuf>, // Path to the output image
-    image_handle: Option<Handle>, // Handle for the original image
-    filtered_image_handle: Option<Handle>, // Handle for the filtered image
-    grain_intensity: i16, // Grain intensity value
+    input_path: Option<PathBuf>,
+    output_path: Option<PathBuf>,
+    image_handle: Option<Handle>,
+    filtered_image_handle: Option<Handle>,
+    grain_intensity: i16,
+    color_enhancement: f32,
+    glow_intensity: f32,
+    sharpness: f32,
 }
+
 
 // Define the messages that the application can handle
 #[derive(Debug, Clone)]
 pub enum Message {
-    SelectImage, // Message for selecting an image
-    ProcessImage, // Message for processing the image
-    GrainIntensityChanged(i16), // Message for changing grain intensity
+    SelectImage,
+    ProcessImage,
+    GrainIntensityChanged(i16),
+    ColorEnhancementChanged(f32),
+    GlowIntensityChanged(f32),
+    SharpnessChanged(f32),
 }
-
 // Implement the Sandbox trait for the application
 impl Sandbox for ImageFilterApp {
-    // Initialize the application state
     fn new() -> Self {
         ImageFilterApp {
             input_path: None,
             output_path: None,
             image_handle: None,
             filtered_image_handle: None,
-            grain_intensity: 10, // Default grain intensity
+            grain_intensity: 10,
+            color_enhancement: 1.05,
+            glow_intensity: 0.05,
+            sharpness: 0.8,
         }
     }
 
@@ -76,6 +84,7 @@ impl Sandbox for ImageFilterApp {
     }
 
     // Handle messages and update the application state
+  
     fn update(&mut self, message: Message) {
         match message {
             Message::SelectImage => {
@@ -96,19 +105,7 @@ impl Sandbox for ImageFilterApp {
                                 self.image_handle = Some(Handle::from_memory(image_data));
 
                                 // Apply the filter immediately for preview
-                                let output_path = path.with_file_name("output_preview.png");
-                                if image_processing::apply_filter(&path, &output_path, self.grain_intensity).is_ok() {
-                                    match fs::read(&output_path) {
-                                        Ok(filtered_image_data) => {
-                                            self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
-                                        }
-                                        Err(e) => {
-                                            error!("Failed to read filtered image file: {:?}", e);
-                                        }
-                                    }
-                                } else {
-                                    error!("Error processing image");
-                                }
+                                self.update_preview();
                             }
                             Err(e) => {
                                 error!("Failed to read image file: {:?}", e);
@@ -122,10 +119,16 @@ impl Sandbox for ImageFilterApp {
                 }
             }
             Message::ProcessImage => {
-                // Apply the filter and save the output image
                 if let Some(ref input_path) = self.input_path {
                     let output_path = input_path.with_file_name("output.png");
-                    if image_processing::apply_filter(input_path, &output_path, self.grain_intensity).is_ok() {
+                    if image_processing::apply_filter(
+                        input_path,
+                        &output_path,
+                        self.grain_intensity,
+                        self.color_enhancement,
+                        self.glow_intensity,
+                        self.sharpness
+                    ).is_ok() {
                         // Optimize the output image using ffmpeg
                         if let Err(e) = optimize_image(&output_path, &output_path) {
                             error!("Failed to optimize image: {:?}", e);
@@ -140,40 +143,42 @@ impl Sandbox for ImageFilterApp {
             }
             Message::GrainIntensityChanged(intensity) => {
                 self.grain_intensity = intensity;
-                info!("Grain intensity changed to {}", intensity);
-                // Reapply the filter for preview
-                if let Some(ref input_path) = self.input_path {
-                    let output_path = input_path.with_file_name("output_preview.png");
-                    if image_processing::apply_filter(input_path, &output_path, self.grain_intensity).is_ok() {
-                        match fs::read(&output_path) {
-                            Ok(filtered_image_data) => {
-                                self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
-                            }
-                            Err(e) => {
-                                error!("Failed to read filtered image file: {:?}", e);
-                            }
-                        }
-                    } else {
-                        error!("Error processing image");
-                    }
-                }
+                self.update_preview();
+            }
+            Message::ColorEnhancementChanged(enhancement) => {
+                self.color_enhancement = enhancement;
+                self.update_preview();
+            }
+            Message::GlowIntensityChanged(intensity) => {
+                self.glow_intensity = intensity;
+                self.update_preview();
+            }
+            Message::SharpnessChanged(sharpness) => {
+                self.sharpness = sharpness;
+                self.update_preview();
             }
         }
     }
-    
+
     fn view(&self) -> Element<Message> {
-        // Button to select an image
         let select_button = Button::new("Select Image")
             .on_press(Message::SelectImage);
 
-        // Button to apply the filter and save the output
         let apply_button = Button::new("Apply Filter")
             .on_press(Message::ProcessImage);
 
-        // Slider to control grain intensity
-        let grain_slider = Slider::new(0..=20, self.grain_intensity, Message::GrainIntensityChanged);
+        let grain_slider = Slider::new(0..=20, self.grain_intensity, Message::GrainIntensityChanged)
+            .step(1i16);
 
-        // Side panel content
+        let color_enhancement_slider = Slider::new(1.0..=1.2, self.color_enhancement, |v| Message::ColorEnhancementChanged(v))
+            .step(0.01);
+
+        let glow_intensity_slider = Slider::new(0.0..=0.2, self.glow_intensity, |v| Message::GlowIntensityChanged(v))
+            .step(0.01);
+
+        let sharpness_slider = Slider::new(0.0..=2.0, self.sharpness, |v| Message::SharpnessChanged(v))
+            .step(0.1);
+
         let side_panel = Column::new()
             .spacing(20)
             .padding(20)
@@ -181,6 +186,12 @@ impl Sandbox for ImageFilterApp {
             .push(Text::new("Controls"))
             .push(Text::new(format!("Grain Intensity: {}", self.grain_intensity)))
             .push(grain_slider)
+            .push(Text::new(format!("Color Enhancement: {:.2}", self.color_enhancement)))
+            .push(color_enhancement_slider)
+            .push(Text::new(format!("Glow Intensity: {:.2}", self.glow_intensity)))
+            .push(glow_intensity_slider)
+            .push(Text::new(format!("Sharpness: {:.1}", self.sharpness)))
+            .push(sharpness_slider)
             .push(select_button);
 
         // Main content
@@ -243,6 +254,34 @@ impl Sandbox for ImageFilterApp {
     
     type Message = Message;
 }
+
+impl ImageFilterApp {
+    fn update_preview(&mut self) {
+        if let Some(ref input_path) = self.input_path {
+            let output_path = input_path.with_file_name("output_preview.png");
+            if image_processing::apply_filter(
+                input_path,
+                &output_path,
+                self.grain_intensity,
+                self.color_enhancement,
+                self.glow_intensity,
+                self.sharpness
+            ).is_ok() {
+                match fs::read(&output_path) {
+                    Ok(filtered_image_data) => {
+                        self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
+                    }
+                    Err(e) => {
+                        error!("Failed to read filtered image file: {:?}", e);
+                    }
+                }
+            } else {
+                error!("Error processing image");
+            }
+        }
+    }
+}
+
 
 // Implement the Drop trait for the application
 impl Drop for ImageFilterApp {
