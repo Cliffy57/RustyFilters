@@ -163,42 +163,51 @@ impl Sandbox for ImageFilterApp {
     fn view(&self) -> Element<Message> {
         let select_button = Button::new("Select Image")
             .on_press(Message::SelectImage);
-
+    
         let apply_button = Button::new("Apply Filter")
             .on_press(Message::ProcessImage);
-
+    
         let grain_slider = Slider::new(0..=20, self.grain_intensity, Message::GrainIntensityChanged)
             .step(1i16);
-
+    
         let color_enhancement_slider = Slider::new(1.0..=1.2, self.color_enhancement, |v| Message::ColorEnhancementChanged(v))
             .step(0.01);
-
+    
         let glow_intensity_slider = Slider::new(0.0..=0.2, self.glow_intensity, |v| Message::GlowIntensityChanged(v))
             .step(0.01);
-
+    
         let sharpness_slider = Slider::new(0.0..=2.0, self.sharpness, |v| Message::SharpnessChanged(v))
             .step(0.1);
-
-        let side_panel = Column::new()
-            .spacing(20)
-            .padding(20)
-            .width(Length::Fixed(200.0))
-            .push(Text::new("Controls"))
-            .push(Text::new(format!("Grain Intensity: {}", self.grain_intensity)))
-            .push(grain_slider)
-            .push(Text::new(format!("Color Enhancement: {:.2}", self.color_enhancement)))
-            .push(color_enhancement_slider)
-            .push(Text::new(format!("Glow Intensity: {:.2}", self.glow_intensity)))
-            .push(glow_intensity_slider)
-            .push(Text::new(format!("Sharpness: {:.1}", self.sharpness)))
-            .push(sharpness_slider)
-            .push(select_button);
-
+    
+        let side_panel = Container::new(
+            Column::new()
+                .spacing(10)
+                .padding(20)
+                .push(Text::new("Controls").size(20))
+                .push(Container::new(Text::new(format!("Grain Intensity: {}", self.grain_intensity)))
+                    .padding(5))
+                .push(grain_slider)
+                .push(Container::new(Text::new(format!("Color Enhancement: {:.2}", self.color_enhancement)))
+                    .padding(5))
+                .push(color_enhancement_slider)
+                .push(Container::new(Text::new(format!("Glow Intensity: {:.2}", self.glow_intensity)))
+                    .padding(5))
+                .push(glow_intensity_slider)
+                .push(Container::new(Text::new(format!("Sharpness: {:.1}", self.sharpness)))
+                    .padding(5))
+                .push(sharpness_slider)
+                .push(select_button)
+        )
+        .width(Length::Fixed(250.0))
+        .padding(10)
+        .center_x();
+    
         // Main content
         let mut main_content = Column::new()
             .spacing(20)
-            .align_items(Alignment::Center);
-
+            .align_items(Alignment::Center)
+            .push(Text::new("Image Preview").size(20));
+    
         // Display the original image preview if available
         if let Some(ref image_handle) = self.image_handle {
             let image_widget = Image::new(image_handle.clone())
@@ -206,7 +215,7 @@ impl Sandbox for ImageFilterApp {
                 .height(Length::Fill);
             main_content = main_content.push(image_widget);
         }
-
+    
         // Display the filtered image preview if available
         if let Some(ref filtered_image_handle) = self.filtered_image_handle {
             let filtered_image_widget = Image::new(filtered_image_handle.clone())
@@ -216,19 +225,21 @@ impl Sandbox for ImageFilterApp {
             // Add the apply button only if there is a filtered image preview
             main_content = main_content.push(apply_button);
         }
-
+    
         // Combine side panel and main content in a row
         let content = Row::new()
+            .spacing(20)
             .push(side_panel)
-            .push(main_content);
-
+            .push(Container::new(main_content).padding(20).center_x().center_y());
+    
         // Build and return the UI container
         Container::new(content)
             .width(Length::Fill)
             .height(Length::Fill)
+            .padding(20)
             .into()
     }
-
+    
     // Set the application theme
     fn theme(&self) -> iced::Theme {
         iced::Theme::default()
