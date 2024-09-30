@@ -65,6 +65,7 @@ pub enum Message {
     SharpnessChanged(f32),
     ApplyGrayscale,
 }
+
 // Implement the Sandbox trait for the application
 impl Sandbox for ImageFilterApp {
     fn new() -> Self {
@@ -87,7 +88,6 @@ impl Sandbox for ImageFilterApp {
     }
 
     // Handle messages and update the application state
-  
     fn update(&mut self, message: Message) {
         match message {
             Message::SelectImage => {
@@ -163,29 +163,7 @@ impl Sandbox for ImageFilterApp {
             }
             Message::ApplyGrayscale => {
                 self.apply_grayscale = !self.apply_grayscale;
-                if let Some(ref input_path) = self.input_path {
-                    let output_path = input_path.with_file_name("output_grayscale.png");
-                    if image_processing::apply_filter(
-                        input_path,
-                        &output_path,
-                        self.grain_intensity,
-                        self.color_enhancement,
-                        self.glow_intensity,
-                        self.sharpness,
-                        true
-                    ).is_ok() {
-                        match fs::read(&output_path) {
-                            Ok(filtered_image_data) => {
-                                self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
-                            }
-                            Err(e) => {
-                                error!("Failed to read filtered image file: {:?}", e);
-                            }
-                        }
-                    } else {
-                        error!("Error processing image");
-                    }
-                }
+                self.update_preview();
             }
         }
     }
