@@ -162,6 +162,7 @@ impl Sandbox for ImageFilterApp {
                 self.update_preview();
             }
             Message::ApplyGrayscale => {
+                self.apply_grayscale = !self.apply_grayscale;
                 if let Some(ref input_path) = self.input_path {
                     let output_path = input_path.with_file_name("output_grayscale.png");
                     if image_processing::apply_filter(
@@ -192,25 +193,31 @@ impl Sandbox for ImageFilterApp {
     fn view(&self) -> Element<Message> {
         let select_button = Button::new("Select Image")
             .on_press(Message::SelectImage);
-    
+
         let apply_button = Button::new("Apply Filter")
             .on_press(Message::ProcessImage);
-    
+
         let grain_slider = Slider::new(0..=20, self.grain_intensity, Message::GrainIntensityChanged)
             .step(1i16);
-    
+
         let color_enhancement_slider = Slider::new(1.0..=1.2, self.color_enhancement, |v| Message::ColorEnhancementChanged(v))
             .step(0.01);
-    
+
         let glow_intensity_slider = Slider::new(0.0..=0.2, self.glow_intensity, |v| Message::GlowIntensityChanged(v))
             .step(0.01);
-    
+
         let sharpness_slider = Slider::new(0.0..=2.0, self.sharpness, |v| Message::SharpnessChanged(v))
             .step(0.1);
 
-        let grayscale_button = Button::new("Apply Grayscale")
-            .on_press(Message::ApplyGrayscale); // New button for grayscale filter
-    
+        let grayscale_button_label = if self.apply_grayscale {
+            "Remove Grayscale"
+        } else {
+            "Apply Grayscale"
+        };
+
+        let grayscale_button = Button::new(grayscale_button_label)
+            .on_press(Message::ApplyGrayscale);
+
         let side_panel = Container::new(
             Column::new()
                 .spacing(10)
@@ -234,13 +241,13 @@ impl Sandbox for ImageFilterApp {
         .width(Length::Fixed(250.0))
         .padding(10)
         .center_x();
-    
+
         // Main content
         let mut main_content = Column::new()
             .spacing(20)
             .align_items(Alignment::Center)
             .push(Text::new("Image Preview").size(20));
-    
+
         // Display the original image preview if available
         if let Some(ref image_handle) = self.image_handle {
             let image_widget = Image::new(image_handle.clone())
@@ -248,7 +255,7 @@ impl Sandbox for ImageFilterApp {
                 .height(Length::Fill);
             main_content = main_content.push(image_widget);
         }
-    
+
         // Display the filtered image preview if available
         if let Some(ref filtered_image_handle) = self.filtered_image_handle {
             let filtered_image_widget = Image::new(filtered_image_handle.clone())
@@ -258,13 +265,13 @@ impl Sandbox for ImageFilterApp {
             // Add the apply button only if there is a filtered image preview
             main_content = main_content.push(apply_button);
         }
-    
+
         // Combine side panel and main content in a row
         let content = Row::new()
             .spacing(20)
             .push(side_panel)
             .push(Container::new(main_content).padding(20).center_x().center_y());
-    
+
         // Build and return the UI container
         Container::new(content)
             .width(Length::Fill)
