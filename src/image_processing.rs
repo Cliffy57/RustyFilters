@@ -19,10 +19,15 @@ pub fn apply_filter<P: AsRef<Path>>(
     grain_intensity: i16,
     color_enhancement: f32,
     glow_intensity: f32,
-    sharpness: f32
+    sharpness: f32,
+    apply_grayscale: bool, // New parameter to control grayscale filter
 ) -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(input_path)?;
     let mut filtered_img = img.to_rgba8();
+
+    if apply_grayscale {
+        filtered_img = to_grayscale(&filtered_img);
+    }
 
     add_grain(&mut filtered_img, grain_intensity);
     let enhanced_img = enhance_colors(&filtered_img, color_enhancement);
@@ -120,6 +125,7 @@ fn add_glow(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, intensity: f32) -> ImageBuffer
 /// # Returns
 ///
 /// * An `ImageBuffer` with slightly increased sharpness.
+
 fn sharpen(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, sharpness: f32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let (width, height) = img.dimensions();
     let mut sharpened_img = img.clone();
@@ -153,6 +159,30 @@ fn sharpen(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, sharpness: f32) -> ImageBuffer<
 
     sharpened_img
 }
+/// Converts the image to grayscale.
+///
+/// # Arguments
+///
+/// * `img` - The input image buffer.
+///
+/// # Returns
+///
+/// * An `ImageBuffer` with the grayscale effect applied.
+fn to_grayscale(img: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let (width, height) = img.dimensions();
+    let mut grayscale_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+
+    for (x, y, pixel) in grayscale_img.enumerate_pixels_mut() {
+        let original = img.get_pixel(x, y);
+        let gray_value = (0.299 * original[0] as f32 + 0.587 * original[1] as f32 + 0.114 * original[2] as f32) as u8;
+        for c in 0..3 {
+            pixel[c] = gray_value;
+        }
+        pixel[3] = original[3]; // Preserve alpha channel
+    }
+
+    grayscale_img
+}
 
 fn main() {
     let input_image_path: &str = "src/input.png";
@@ -165,7 +195,7 @@ fn main() {
         return;
     }
 
-    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8) {
+    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8, true) {
         Ok(_) => println!("Image processing completed successfully."),
         Err(e) => println!("Error processing image: {}", e),
     }

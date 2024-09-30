@@ -50,6 +50,7 @@ pub struct ImageFilterApp {
     color_enhancement: f32,
     glow_intensity: f32,
     sharpness: f32,
+    apply_grayscale: bool, 
 }
 
 
@@ -62,6 +63,7 @@ pub enum Message {
     ColorEnhancementChanged(f32),
     GlowIntensityChanged(f32),
     SharpnessChanged(f32),
+    ApplyGrayscale,
 }
 // Implement the Sandbox trait for the application
 impl Sandbox for ImageFilterApp {
@@ -75,6 +77,7 @@ impl Sandbox for ImageFilterApp {
             color_enhancement: 1.05,
             glow_intensity: 0.05,
             sharpness: 0.8,
+            apply_grayscale: false, 
         }
     }
 
@@ -127,7 +130,8 @@ impl Sandbox for ImageFilterApp {
                         self.grain_intensity,
                         self.color_enhancement,
                         self.glow_intensity,
-                        self.sharpness
+                        self.sharpness,
+                        self.apply_grayscale
                     ).is_ok() {
                         // Optimize the output image using ffmpeg
                         if let Err(e) = optimize_image(&output_path, &output_path) {
@@ -157,6 +161,31 @@ impl Sandbox for ImageFilterApp {
                 self.sharpness = sharpness;
                 self.update_preview();
             }
+            Message::ApplyGrayscale => {
+                if let Some(ref input_path) = self.input_path {
+                    let output_path = input_path.with_file_name("output_grayscale.png");
+                    if image_processing::apply_filter(
+                        input_path,
+                        &output_path,
+                        self.grain_intensity,
+                        self.color_enhancement,
+                        self.glow_intensity,
+                        self.sharpness,
+                        true
+                    ).is_ok() {
+                        match fs::read(&output_path) {
+                            Ok(filtered_image_data) => {
+                                self.filtered_image_handle = Some(Handle::from_memory(filtered_image_data));
+                            }
+                            Err(e) => {
+                                error!("Failed to read filtered image file: {:?}", e);
+                            }
+                        }
+                    } else {
+                        error!("Error processing image");
+                    }
+                }
+            }
         }
     }
 
@@ -178,6 +207,9 @@ impl Sandbox for ImageFilterApp {
     
         let sharpness_slider = Slider::new(0.0..=2.0, self.sharpness, |v| Message::SharpnessChanged(v))
             .step(0.1);
+
+        let grayscale_button = Button::new("Apply Grayscale")
+            .on_press(Message::ApplyGrayscale); // New button for grayscale filter
     
         let side_panel = Container::new(
             Column::new()
@@ -197,6 +229,7 @@ impl Sandbox for ImageFilterApp {
                     .padding(5))
                 .push(sharpness_slider)
                 .push(select_button)
+                .push(grayscale_button) // Add the grayscale button to the side panel
         )
         .width(Length::Fixed(250.0))
         .padding(10)
@@ -276,7 +309,8 @@ impl ImageFilterApp {
                 self.grain_intensity,
                 self.color_enhancement,
                 self.glow_intensity,
-                self.sharpness
+                self.sharpness,
+                self.apply_grayscale
             ).is_ok() {
                 match fs::read(&output_path) {
                     Ok(filtered_image_data) => {
