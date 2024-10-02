@@ -53,6 +53,14 @@ pub struct ImageFilterApp {
     apply_grayscale: bool, 
 }
 
+// Define the menu items
+#[derive(Debug, Clone)]
+pub enum MenuItem {
+    File,
+    Edit,
+    View,
+    Help,
+}
 
 // Define the messages that the application can handle
 #[derive(Debug, Clone)]
@@ -64,6 +72,7 @@ pub enum Message {
     GlowIntensityChanged(f32),
     SharpnessChanged(f32),
     ApplyGrayscale,
+    MenuItemSelected(MenuItem),
 }
 
 // Implement the Sandbox trait for the application
@@ -165,6 +174,24 @@ impl Sandbox for ImageFilterApp {
                 self.apply_grayscale = !self.apply_grayscale;
                 self.update_preview();
             }
+            Message::MenuItemSelected(menu_item) => {
+                info!("Menu item selected: {:?}", menu_item);
+                // Handle menu item selection
+                match menu_item {
+                    MenuItem::File => {
+                        // Handle File menu actions
+                    }
+                    MenuItem::Edit => {
+                        // Handle Edit menu actions
+                    }
+                    MenuItem::View => {
+                        // Handle View menu actions
+                    }
+                    MenuItem::Help => {
+                        // Handle Help menu actions
+                    }
+                }
+            }
         }
     }
 
@@ -244,11 +271,22 @@ impl Sandbox for ImageFilterApp {
             main_content = main_content.push(apply_button);
         }
 
-        // Combine side panel and main content in a row
-        let content = Row::new()
+        // Create the menu bar
+        let menu_bar = Row::new()
             .spacing(20)
-            .push(side_panel)
-            .push(Container::new(main_content).padding(20).center_x().center_y());
+            .push(Button::new("File").on_press(Message::MenuItemSelected(MenuItem::File)))
+            .push(Button::new("Edit").on_press(Message::MenuItemSelected(MenuItem::Edit)))
+            .push(Button::new("View").on_press(Message::MenuItemSelected(MenuItem::View)))
+            .push(Button::new("Help").on_press(Message::MenuItemSelected(MenuItem::Help)));
+
+        // Combine menu bar, side panel, and main content in a column
+        let content = Column::new()
+            .spacing(20)
+            .push(menu_bar)
+            .push(Row::new()
+                .spacing(20)
+                .push(side_panel)
+                .push(Container::new(main_content).padding(20).center_x().center_y()));
 
         // Build and return the UI container
         Container::new(content)
@@ -311,7 +349,6 @@ impl ImageFilterApp {
         }
     }
 }
-
 
 // Implement the Drop trait for the application
 impl Drop for ImageFilterApp {
