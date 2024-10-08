@@ -1,7 +1,7 @@
 use log::{info, error};
 use iced::{
     Alignment, Element, Length, Sandbox, Settings,
-    widget::{Button, Column, Container, Image, Text, Slider, Row},
+    widget::{Button, Column, Container, Image, Text, Slider, Row, Space},
 };
 use iced::widget::image::Handle;
 use native_dialog::FileDialog;
@@ -272,12 +272,7 @@ impl Sandbox for ImageFilterApp {
         }
 
         // Create the menu bar
-        let menu_bar = Row::new()
-            .spacing(20)
-            .push(Button::new("File").on_press(Message::MenuItemSelected(MenuItem::File)))
-            .push(Button::new("Edit").on_press(Message::MenuItemSelected(MenuItem::Edit)))
-            .push(Button::new("View").on_press(Message::MenuItemSelected(MenuItem::View)))
-            .push(Button::new("Help").on_press(Message::MenuItemSelected(MenuItem::Help)));
+        let menu_bar = self.create_menu_bar();
 
         // Combine menu bar, side panel, and main content in a column
         let content = Column::new()
@@ -323,6 +318,27 @@ impl Sandbox for ImageFilterApp {
 }
 
 impl ImageFilterApp {
+    fn create_menu_bar(&self) -> Row<Message> {
+        let file_menu = Button::new("File")
+            .on_press(Message::MenuItemSelected(MenuItem::File));
+        
+        let edit_menu = Button::new("Edit")
+            .on_press(Message::MenuItemSelected(MenuItem::Edit));
+        
+        let view_menu = Button::new("View")
+            .on_press(Message::MenuItemSelected(MenuItem::View));
+        
+        let help_menu = Button::new("Help")
+            .on_press(Message::MenuItemSelected(MenuItem::Help));
+        
+        Row::new()
+            .spacing(20)
+            .push(file_menu)
+            .push(edit_menu)
+            .push(view_menu)
+            .push(help_menu)
+    }
+
     fn update_preview(&mut self) {
         if let Some(ref input_path) = self.input_path {
             let output_path = input_path.with_file_name("output_preview.png");
