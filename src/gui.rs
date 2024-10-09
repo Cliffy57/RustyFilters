@@ -1,7 +1,7 @@
 use log::{info, error};
 use iced::{
     Alignment, Element, Length, Sandbox, Settings,
-    widget::{Button, Column, Container, Image, Text, Slider, Row},
+    widget::{Button, Column, Container, Image, Text, Slider, Row, Space},
 };
 use iced::widget::image::Handle;
 use native_dialog::FileDialog;
@@ -50,8 +50,18 @@ pub struct ImageFilterApp {
     color_enhancement: f32,
     glow_intensity: f32,
     sharpness: f32,
+    exposure: f32,
+    apply_grayscale: bool, 
 }
 
+// Define the menu items
+#[derive(Debug, Clone)]
+pub enum MenuItem {
+    File,
+    Edit,
+    View,
+    Help,
+}
 
 // Define the messages that the application can handle
 #[derive(Debug, Clone)]
@@ -62,7 +72,11 @@ pub enum Message {
     ColorEnhancementChanged(f32),
     GlowIntensityChanged(f32),
     SharpnessChanged(f32),
+    ExposureChanged(f32),
+    ApplyGrayscale,
+    MenuItemSelected(MenuItem),
 }
+
 // Implement the Sandbox trait for the application
 impl Sandbox for ImageFilterApp {
     fn new() -> Self {
@@ -75,6 +89,8 @@ impl Sandbox for ImageFilterApp {
             color_enhancement: 1.05,
             glow_intensity: 0.05,
             sharpness: 0.8,
+            exposure: 1.0,
+            apply_grayscale: false, 
         }
     }
 
@@ -84,7 +100,6 @@ impl Sandbox for ImageFilterApp {
     }
 
     // Handle messages and update the application state
-  
     fn update(&mut self, message: Message) {
         match message {
             Message::SelectImage => {
@@ -127,7 +142,9 @@ impl Sandbox for ImageFilterApp {
                         self.grain_intensity,
                         self.color_enhancement,
                         self.glow_intensity,
-                        self.sharpness
+                        self.sharpness,
+                        self.exposure,
+                        self.apply_grayscale
                     ).is_ok() {
                         // Optimize the output image using ffmpeg
                         if let Err(e) = optimize_image(&output_path, &output_path) {
@@ -157,6 +174,32 @@ impl Sandbox for ImageFilterApp {
                 self.sharpness = sharpness;
                 self.update_preview();
             }
+            Message::ExposureChanged(exposure) => {
+                self.exposure = exposure;
+                self.update_preview();
+            }
+            Message::ApplyGrayscale => {
+                self.apply_grayscale = !self.apply_grayscale;
+                self.update_preview();
+            }
+            Message::MenuItemSelected(menu_item) => {
+                info!("Menu item selected: {:?}", menu_item);
+                // Handle menu item selection
+                match menu_item {
+                    MenuItem::File => {
+                        // Handle File menu actions
+                    }
+                    MenuItem::Edit => {
+                        // Handle Edit menu actions
+                    }
+                    MenuItem::View => {
+                        // Handle View menu actions
+                    }
+                    MenuItem::Help => {
+                        // Handle Help menu actions
+                    }
+                }
+            }
         }
     }
 
@@ -178,26 +221,49 @@ impl Sandbox for ImageFilterApp {
 
         let sharpness_slider = Slider::new(0.0..=2.0, self.sharpness, |v| Message::SharpnessChanged(v))
             .step(0.1);
+        let exposure_slider = Slider::new(0.0..=2.0, self.exposure, |v| Message::ExposureChanged(v))
+            .step(0.1);
+        let grayscale_button_label = if self.apply_grayscale {
+            "Remove Grayscale"
+        } else {
+            "Apply Grayscale"
+        };
 
-        let side_panel = Column::new()
-            .spacing(20)
-            .padding(20)
-            .width(Length::Fixed(200.0))
-            .push(Text::new("Controls"))
-            .push(Text::new(format!("Grain Intensity: {}", self.grain_intensity)))
-            .push(grain_slider)
-            .push(Text::new(format!("Color Enhancement: {:.2}", self.color_enhancement)))
-            .push(color_enhancement_slider)
-            .push(Text::new(format!("Glow Intensity: {:.2}", self.glow_intensity)))
-            .push(glow_intensity_slider)
-            .push(Text::new(format!("Sharpness: {:.1}", self.sharpness)))
-            .push(sharpness_slider)
-            .push(select_button);
+        let grayscale_button = Button::new(grayscale_button_label)
+            .on_press(Message::ApplyGrayscale);
+
+        let side_panel = Container::new(
+            Column::new()
+                .spacing(10)
+                .padding(20)
+                .push(Text::new("Controls").size(20))
+                .push(Container::new(Text::new(format!("Grain Intensity: {}", self.grain_intensity)))
+                    .padding(5))
+                .push(grain_slider)
+                .push(Container::new(Text::new(format!("Color Enhancement: {:.2}", self.color_enhancement)))
+                    .padding(5))
+                .push(color_enhancement_slider)
+                .push(Container::new(Text::new(format!("Glow Intensity: {:.2}", self.glow_intensity)))
+                    .padding(5))
+                .push(glow_intensity_slider)
+                .push(Container::new(Text::new(format!("Sharpness: {:.1}", self.sharpness)))
+                    .padding(5))
+                .push(sharpness_slider)
+                .push(Container::new(Text::new(format!("Exposure: {:.1}", self.exposure)))
+                    .padding(5))
+                .push(exposure_slider)
+                .push(select_button)
+                .push(grayscale_button) // Add the grayscale button to the side panel
+        )
+        .width(Length::Fixed(250.0))
+        .padding(10)
+        .center_x();
 
         // Main content
         let mut main_content = Column::new()
             .spacing(20)
-            .align_items(Alignment::Center);
+            .align_items(Alignment::Center)
+            .push(Text::new("Image Preview").size(20));
 
         // Display the original image preview if available
         if let Some(ref image_handle) = self.image_handle {
@@ -217,18 +283,26 @@ impl Sandbox for ImageFilterApp {
             main_content = main_content.push(apply_button);
         }
 
-        // Combine side panel and main content in a row
-        let content = Row::new()
-            .push(side_panel)
-            .push(main_content);
+        // Create the menu bar
+        let menu_bar = self.create_menu_bar();
+
+        // Combine menu bar, side panel, and main content in a column
+        let content = Column::new()
+            .spacing(20)
+            .push(menu_bar)
+            .push(Row::new()
+                .spacing(20)
+                .push(side_panel)
+                .push(Container::new(main_content).padding(20).center_x().center_y()));
 
         // Build and return the UI container
         Container::new(content)
             .width(Length::Fill)
             .height(Length::Fill)
+            .padding(20)
             .into()
     }
-
+    
     // Set the application theme
     fn theme(&self) -> iced::Theme {
         iced::Theme::default()
@@ -256,6 +330,27 @@ impl Sandbox for ImageFilterApp {
 }
 
 impl ImageFilterApp {
+    fn create_menu_bar(&self) -> Row<Message> {
+        let file_menu = Button::new("File")
+            .on_press(Message::MenuItemSelected(MenuItem::File));
+        
+        let edit_menu = Button::new("Edit")
+            .on_press(Message::MenuItemSelected(MenuItem::Edit));
+        
+        let view_menu = Button::new("View")
+            .on_press(Message::MenuItemSelected(MenuItem::View));
+        
+        let help_menu = Button::new("Help")
+            .on_press(Message::MenuItemSelected(MenuItem::Help));
+        
+        Row::new()
+            .spacing(20)
+            .push(file_menu)
+            .push(edit_menu)
+            .push(view_menu)
+            .push(help_menu)
+    }
+
     fn update_preview(&mut self) {
         if let Some(ref input_path) = self.input_path {
             let output_path = input_path.with_file_name("output_preview.png");
@@ -265,7 +360,9 @@ impl ImageFilterApp {
                 self.grain_intensity,
                 self.color_enhancement,
                 self.glow_intensity,
-                self.sharpness
+                self.sharpness,
+                self.exposure,
+                self.apply_grayscale
             ).is_ok() {
                 match fs::read(&output_path) {
                     Ok(filtered_image_data) => {
@@ -281,7 +378,6 @@ impl ImageFilterApp {
         }
     }
 }
-
 
 // Implement the Drop trait for the application
 impl Drop for ImageFilterApp {

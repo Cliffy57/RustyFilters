@@ -1,6 +1,6 @@
 use image::{ImageBuffer, Rgba};
-use std::path::Path;
 use rand::prelude::*;
+use std::path::Path;
 
 /// Applies various filters and effects to an input image and saves the result.
 ///
@@ -19,20 +19,26 @@ pub fn apply_filter<P: AsRef<Path>>(
     grain_intensity: i16,
     color_enhancement: f32,
     glow_intensity: f32,
-    sharpness: f32
+    sharpness: f32,
+    exposure : f32, 
+    apply_grayscale: bool, // New parameter to control grayscale filter
 ) -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(input_path)?;
     let mut filtered_img = img.to_rgba8();
 
+    if apply_grayscale {
+        filtered_img = to_grayscale(&filtered_img);
+    }
+
     add_grain(&mut filtered_img, grain_intensity);
     let enhanced_img = enhance_colors(&filtered_img, color_enhancement);
     let glowed_img = add_glow(&enhanced_img, glow_intensity);
-    let final_img = sharpen(&glowed_img, sharpness);
+    let exposed_img = adjust_exposure(&glowed_img, exposure);
+    let final_img = sharpen(&exposed_img, sharpness);
 
     final_img.save(output_path)?;
     Ok(())
 }
-
 
 /// Adds a grain effect to the image by introducing random noise.
 ///
@@ -59,7 +65,10 @@ fn add_grain(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, intensity: i16) {
 /// # Returns
 ///
 /// * An `ImageBuffer` with slightly enhanced colors.
-fn enhance_colors(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, enhancement: f32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+fn enhance_colors(
+    img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    enhancement: f32,
+) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let (width, height) = img.dimensions();
     let mut enhanced_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
 
@@ -84,7 +93,10 @@ fn enhance_colors(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, enhancement: f32) -> Ima
 /// # Returns
 ///
 /// * An `ImageBuffer` with a subtle glow effect applied.
-fn add_glow(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, intensity: f32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+fn add_glow(
+    img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    intensity: f32,
+) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let (width, height) = img.dimensions();
     let mut glowed_img = img.clone();
     let glow_radius = 3;
@@ -103,7 +115,8 @@ fn add_glow(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, intensity: f32) -> ImageBuffer
             }
             let pixel = glowed_img.get_pixel_mut(x, y);
             for c in 0..3 {
-                pixel[c] = ((pixel[c] as f32 * (1.0 - intensity) + glow[c] * intensity).min(255.0)) as u8;
+                pixel[c] =
+                    ((pixel[c] as f32 * (1.0 - intensity) + glow[c] * intensity).min(255.0)) as u8;
             }
         }
     }
@@ -120,20 +133,17 @@ fn add_glow(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, intensity: f32) -> ImageBuffer
 /// # Returns
 ///
 /// * An `ImageBuffer` with slightly increased sharpness.
+
 fn sharpen(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, sharpness: f32) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let (width, height) = img.dimensions();
     let mut sharpened_img = img.clone();
 
     let center = 1.0 + 4.0 * sharpness;
     let sides = -sharpness;
-    let kernel: [[f32; 3]; 3] = [
-        [0.0,   sides, 0.0  ],
-        [sides, center, sides],
-        [0.0,   sides, 0.0  ],
-    ];
+    let kernel: [[f32; 3]; 3] = [[0.0, sides, 0.0], [sides, center, sides], [0.0, sides, 0.0]];
 
-    for y in 1..height-1 {
-        for x in 1..width-1 {
+    for y in 1..height - 1 {
+        for x in 1..width - 1 {
             let mut new_pixel = [0.0; 4];
             for ky in 0..3 {
                 for kx in 0..3 {
@@ -153,6 +163,59 @@ fn sharpen(img: &ImageBuffer<Rgba<u8>, Vec<u8>>, sharpness: f32) -> ImageBuffer<
 
     sharpened_img
 }
+/// Converts the image to grayscale.
+///
+/// # Arguments
+///
+/// * `img` - The input image buffer.
+///
+/// # Returns
+///
+/// * An `ImageBuffer` with the grayscale effect applied.
+fn to_grayscale(img: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let (width, height) = img.dimensions();
+    let mut grayscale_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+
+    for (x, y, pixel) in grayscale_img.enumerate_pixels_mut() {
+        let original = img.get_pixel(x, y);
+        let gray_value = (0.299 * original[0] as f32
+            + 0.587 * original[1] as f32
+            + 0.114 * original[2] as f32) as u8;
+        for c in 0..3 {
+            pixel[c] = gray_value;
+        }
+        pixel[3] = original[3]; // Preserve alpha channel
+    }
+
+    grayscale_img
+}
+
+/// Adjusts the exposure of the image.
+///
+/// # Arguments
+///
+/// * `img` - The input image buffer.
+/// * `adjustment` - The exposure adjustment factor. Positive values increase exposure, negative values decrease exposure.
+///
+/// # Returns
+///
+/// * An `ImageBuffer` with the exposure adjusted.
+fn adjust_exposure(
+    img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    adjustment: f32,
+) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let (width, height) = img.dimensions();
+    let mut adjusted_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+    for (x, y, pixel) in adjusted_img.enumerate_pixels_mut() {
+        let original = img.get_pixel(x, y);
+        for c in 0..3 {
+            let value = original[c] as f32;
+            pixel[c] = ((value * adjustment).min(255.0).max(0.0)) as u8;
+        }
+        pixel[3] = original[3]; // Preserve alpha channel
+    }
+    adjusted_img
+}
 
 fn main() {
     let input_image_path: &str = "src/input.png";
@@ -165,7 +228,7 @@ fn main() {
         return;
     }
 
-    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8) {
+    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8,1.0, true) {
         Ok(_) => println!("Image processing completed successfully."),
         Err(e) => println!("Error processing image: {}", e),
     }
