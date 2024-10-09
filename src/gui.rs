@@ -50,6 +50,7 @@ pub struct ImageFilterApp {
     color_enhancement: f32,
     glow_intensity: f32,
     sharpness: f32,
+    exposure: f32,
     apply_grayscale: bool, 
 }
 
@@ -71,6 +72,7 @@ pub enum Message {
     ColorEnhancementChanged(f32),
     GlowIntensityChanged(f32),
     SharpnessChanged(f32),
+    ExposureChanged(f32),
     ApplyGrayscale,
     MenuItemSelected(MenuItem),
 }
@@ -87,6 +89,7 @@ impl Sandbox for ImageFilterApp {
             color_enhancement: 1.05,
             glow_intensity: 0.05,
             sharpness: 0.8,
+            exposure: 1.0,
             apply_grayscale: false, 
         }
     }
@@ -140,6 +143,7 @@ impl Sandbox for ImageFilterApp {
                         self.color_enhancement,
                         self.glow_intensity,
                         self.sharpness,
+                        self.exposure,
                         self.apply_grayscale
                     ).is_ok() {
                         // Optimize the output image using ffmpeg
@@ -168,6 +172,10 @@ impl Sandbox for ImageFilterApp {
             }
             Message::SharpnessChanged(sharpness) => {
                 self.sharpness = sharpness;
+                self.update_preview();
+            }
+            Message::ExposureChanged(exposure) => {
+                self.exposure = exposure;
                 self.update_preview();
             }
             Message::ApplyGrayscale => {
@@ -213,7 +221,8 @@ impl Sandbox for ImageFilterApp {
 
         let sharpness_slider = Slider::new(0.0..=2.0, self.sharpness, |v| Message::SharpnessChanged(v))
             .step(0.1);
-
+        let exposure_slider = Slider::new(0.0..=2.0, self.exposure, |v| Message::ExposureChanged(v))
+            .step(0.1);
         let grayscale_button_label = if self.apply_grayscale {
             "Remove Grayscale"
         } else {
@@ -240,6 +249,9 @@ impl Sandbox for ImageFilterApp {
                 .push(Container::new(Text::new(format!("Sharpness: {:.1}", self.sharpness)))
                     .padding(5))
                 .push(sharpness_slider)
+                .push(Container::new(Text::new(format!("Exposure: {:.1}", self.exposure)))
+                    .padding(5))
+                .push(exposure_slider)
                 .push(select_button)
                 .push(grayscale_button) // Add the grayscale button to the side panel
         )
@@ -349,6 +361,7 @@ impl ImageFilterApp {
                 self.color_enhancement,
                 self.glow_intensity,
                 self.sharpness,
+                self.exposure,
                 self.apply_grayscale
             ).is_ok() {
                 match fs::read(&output_path) {
