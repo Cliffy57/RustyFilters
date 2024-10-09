@@ -31,8 +31,7 @@ Install `ffmpeg` using your package manager. For example, on Ubuntu, you can run
 ```sh
 sudo apt-get update
 sudo apt-get install ffmpeg# RustyFilters
-
-RustyFilters is an image processing tool written in Rust that applies various filters and effects to images.
+```
 
 ## Features
 
