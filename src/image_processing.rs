@@ -21,6 +21,8 @@ pub fn apply_filter<P: AsRef<Path>>(
     glow_intensity: f32,
     sharpness: f32,
     exposure : f32, 
+    whites : f32,
+    blacks : f32,
     apply_grayscale: bool, // New parameter to control grayscale filter
 ) -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(input_path)?;
@@ -34,7 +36,9 @@ pub fn apply_filter<P: AsRef<Path>>(
     let enhanced_img = enhance_colors(&filtered_img, color_enhancement);
     let glowed_img = add_glow(&enhanced_img, glow_intensity);
     let exposed_img = adjust_exposure(&glowed_img, exposure);
-    let final_img = sharpen(&exposed_img, sharpness);
+    let blacks_img = adjust_blacks(&exposed_img, blacks);
+    let whites_img: ImageBuffer<Rgba<u8>, Vec<u8>>  = adjust_whites(&blacks_img, whites);
+    let final_img = sharpen(&whites_img, sharpness);
 
     final_img.save(output_path)?;
     Ok(())
@@ -216,6 +220,119 @@ fn adjust_exposure(
     }
     adjusted_img
 }
+/// Adjusts the whites of the image using a non-linear curve for more natural results.
+///
+/// # Arguments
+///
+/// * `img` - The input image buffer.
+/// * `adjustment` - The whites adjustment factor. Positive values increase whites, negative values decrease whites.
+///                 Recommended range: -1.0 to 1.0
+///
+/// # Returns
+///
+/// * An `ImageBuffer` with the whites adjusted.
+fn adjust_whites(
+    img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    adjustment: f32,
+) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let (width, height) = img.dimensions();
+    let mut adjusted_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+
+    // Normalize adjustment to a reasonable range
+    let adj = adjustment.max(-1.0).min(1.0);
+    
+    for (x, y, pixel) in adjusted_img.enumerate_pixels_mut() {
+        let original = img.get_pixel(x, y);
+        
+        for c in 0..3 {
+            let value = original[c] as f32 / 255.0; // Normalize to 0-1 range
+            
+            // Apply non-linear adjustment curve
+            let adjusted = if adj > 0.0 {
+                // For positive adjustment (increasing whites)
+                let threshold = 0.5 - (adj * 0.5); // Adjustable threshold
+                if value > threshold {
+                    let factor = ((value - threshold) / (1.0 - threshold)).powf(1.0 - adj);
+                    threshold + factor * (1.0 - threshold)
+                } else {
+                    value
+                }
+            } else {
+                // For negative adjustment (decreasing whites)
+                let threshold = 0.5 + (adj.abs() * 0.5);
+                if value > threshold {
+                    let factor = ((value - threshold) / (1.0 - threshold)).powf(1.0 + adj.abs());
+                    threshold + factor * (1.0 - threshold)
+                } else {
+                    value
+                }
+            };
+            
+            // Convert back to u8 range
+            pixel[c] = (adjusted * 255.0).round().max(0.0).min(255.0) as u8;
+        }
+        pixel[3] = original[3]; // Preserve alpha channel
+    }
+    
+    adjusted_img
+}
+
+/// Adjusts the blacks of the image using a non-linear curve for more natural results.
+///
+/// # Arguments
+///
+/// * `img` - The input image buffer.
+/// * `adjustment` - The blacks adjustment factor. Positive values increase blacks, negative values decrease blacks.
+///                 Recommended range: -1.0 to 1.0
+///
+/// # Returns
+///
+/// * An `ImageBuffer` with the blacks adjusted.
+fn adjust_blacks(
+    img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    adjustment: f32,
+) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let (width, height) = img.dimensions();
+    let mut adjusted_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+
+    // Normalize adjustment to a reasonable range
+    let adj = adjustment.max(-1.0).min(1.0);
+    
+    for (x, y, pixel) in adjusted_img.enumerate_pixels_mut() {
+        let original = img.get_pixel(x, y);
+        
+        for c in 0..3 {
+            let value = original[c] as f32 / 255.0; // Normalize to 0-1 range
+            
+            // Apply non-linear adjustment curve
+            let adjusted = if adj > 0.0 {
+                // For positive adjustment (increasing blacks)
+                let threshold = 0.5 + (adj * 0.5); // Adjustable threshold
+                if value < threshold {
+                    let factor = (value / threshold).powf(1.0 + adj);
+                    factor * threshold
+                } else {
+                    value
+                }
+            } else {
+                // For negative adjustment (decreasing blacks)
+                let threshold = 0.5 - (adj.abs() * 0.5);
+                if value < threshold {
+                    let factor = (value / threshold).powf(1.0 - adj.abs());
+                    factor * threshold
+                } else {
+                    value
+                }
+            };
+            
+            // Convert back to u8 range
+            pixel[c] = (adjusted * 255.0).round().max(0.0).min(255.0) as u8;
+        }
+        pixel[3] = original[3]; // Preserve alpha channel
+    }
+    
+    adjusted_img
+}
 
 fn main() {
     let input_image_path: &str = "src/input.png";
@@ -228,7 +345,7 @@ fn main() {
         return;
     }
 
-    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8,1.0, true) {
+    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8,1.0,1.0,1.0, true) {
         Ok(_) => println!("Image processing completed successfully."),
         Err(e) => println!("Error processing image: {}", e),
     }
