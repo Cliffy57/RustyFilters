@@ -20,8 +20,8 @@ fn optimize_image(input_path: &PathBuf, output_path: &PathBuf) -> io::Result<()>
         .args(&[
             "-y", // Add this flag to force overwrite
             "-i", input_path.to_str().unwrap(),
-            "-vf", "scale=iw*0.5:ih*0.5", // Example: scale down by 50%
-            "-q:v", "2", // Set quality level (lower is better quality)
+            "-vf", "scale=iw*2:ih*2", // Example: scale up by 200%
+            "-q:v", "1", // Set quality level (lower is better quality)
             temp_output_path.to_str().unwrap(),
         ])
         .status()?;
