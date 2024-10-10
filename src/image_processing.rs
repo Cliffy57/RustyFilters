@@ -23,6 +23,7 @@ pub fn apply_filter<P: AsRef<Path>>(
     exposure : f32, 
     whites : f32,
     blacks : f32,
+    tint : &[TintAdjustment],
     apply_grayscale: bool, // New parameter to control grayscale filter
 ) -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(input_path)?;
@@ -37,8 +38,9 @@ pub fn apply_filter<P: AsRef<Path>>(
     let glowed_img = add_glow(&enhanced_img, glow_intensity);
     let exposed_img = adjust_exposure(&glowed_img, exposure);
     let blacks_img = adjust_blacks(&exposed_img, blacks);
-    let whites_img: ImageBuffer<Rgba<u8>, Vec<u8>>  = adjust_whites(&blacks_img, whites);
-    let final_img = sharpen(&whites_img, sharpness);
+    let whites_img = adjust_whites(&blacks_img, whites);
+    let tinted_img = adjust_tint(&blacks_img, &tint[0]);
+    let final_img = sharpen(&tinted_img, sharpness);
 
     final_img.save(output_path)?;
     Ok(())
@@ -334,6 +336,181 @@ fn adjust_blacks(
     adjusted_img
 }
 
+/// Represents a tint adjustment configuration
+#[derive(Debug, Clone, Copy)]
+pub struct TintAdjustment {
+    pub hue: f32,         // Target hue (0-360)
+    pub strength: f32,    // Tint strength (0.0 to 1.0)
+    pub preserve_gray: f32, // How much to preserve gray values (0.0 to 1.0)
+    pub luminance_mask: f32, // How much to respect original luminance (-1.0 to 1.0)
+}
+
+impl Default for TintAdjustment {
+    fn default() -> Self {
+        TintAdjustment {
+            hue: 180.0,        // Default to cyan tint
+            strength: 0.3,     // Moderate strength
+            preserve_gray: 0.5, // Preserve some gray values
+            luminance_mask: 0.0, // Neutral luminance masking
+        }
+    }
+}
+
+/// Converts RGB to HSL color space
+fn rgb_to_hsl(r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let delta = max - min;
+
+    let mut h = 0.0;
+    let mut s = 0.0;
+    let l = (max + min) / 2.0;
+
+    if delta != 0.0 {
+        s = if l < 0.5 {
+            delta / (max + min)
+        } else {
+            delta / (2.0 - max - min)
+        };
+
+        h = if r == max {
+            (g - b) / delta + (if g < b { 6.0 } else { 0.0 })
+        } else if g == max {
+            (b - r) / delta + 2.0
+        } else {
+            (r - g) / delta + 4.0
+        };
+
+        h *= 60.0;
+    }
+
+    (h, s, l)
+}
+
+/// Converts HSL to RGB color space
+fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (f32, f32, f32) {
+    if s == 0.0 {
+        return (l, l, l);
+    }
+
+    let q = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - l * s
+    };
+    let p = 2.0 * l - q;
+
+    let h = h / 360.0;
+
+    let tr = (h + 1.0/3.0).rem_euclid(1.0);
+    let tg = h;
+    let tb = (h - 1.0/3.0).rem_euclid(1.0);
+
+    let convert = |t: f32| -> f32 {
+        if t < 1.0/6.0 {
+            p + (q - p) * 6.0 * t
+        } else if t < 1.0/2.0 {
+            q
+        } else if t < 2.0/3.0 {
+            p + (q - p) * (2.0/3.0 - t) * 6.0
+        } else {
+            p
+        }
+    };
+
+    (convert(tr), convert(tg), convert(tb))
+}
+
+/// Calculate the grayscale value of an RGB color
+fn get_grayscale(r: f32, g: f32, b: f32) -> f32 {
+    0.299 * r + 0.587 * g + 0.114 * b
+}
+
+/// Adjusts the tint of the image.
+///
+/// # Arguments
+///
+/// * `img` - The input image buffer.
+/// * `tint` - The tint adjustment configuration.
+///
+/// # Returns
+///
+/// * An `ImageBuffer` with the tint adjusted.
+pub fn adjust_tint(
+    img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    tint: &TintAdjustment,
+) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    let (width, height) = img.dimensions();
+    let mut adjusted_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+
+    // Create target tint color in HSL
+    let target_rgb = hsl_to_rgb(tint.hue, 1.0, 0.5);
+    let target_gray = get_grayscale(target_rgb.0, target_rgb.1, target_rgb.2);
+
+    for (x, y, pixel) in adjusted_img.enumerate_pixels_mut() {
+        let original = img.get_pixel(x, y);
+        
+        // Convert RGB to normalized float values
+        let r = original[0] as f32 / 255.0;
+        let g = original[1] as f32 / 255.0;
+        let b = original[2] as f32 / 255.0;
+
+        // Get original HSL and grayscale values
+        let (orig_h, orig_s, orig_l) = rgb_to_hsl(r, g, b);
+        let gray_value = get_grayscale(r, g, b);
+
+        // Calculate gray preservation factor
+        let gray_factor = if tint.preserve_gray > 0.0 {
+            let color_difference = (r - gray_value).abs() +
+                                 (g - gray_value).abs() +
+                                 (b - gray_value).abs();
+            (1.0 - (color_difference * 2.0)).max(0.0) * tint.preserve_gray
+        } else {
+            0.0
+        };
+
+        // Calculate luminance masking
+        let luminance_factor = if tint.luminance_mask > 0.0 {
+            if tint.luminance_mask > 0.0 {
+                orig_l.powf(1.0 + tint.luminance_mask)
+            } else {
+                orig_l.powf(1.0 / (1.0 - tint.luminance_mask))
+            }
+        } else {
+            1.0
+        };
+
+        // Blend original and tinted colors
+        let tint_strength = tint.strength * (1.0 - gray_factor) * luminance_factor;
+        
+        // Create tinted color while preserving luminance
+        let tinted = if tint_strength > 0.0 {
+            let (_, new_s, _) = rgb_to_hsl(r, g, b);
+            let new_h = tint.hue;
+            let new_l = orig_l;
+            
+            // Blend between original and tinted color
+            let tinted_rgb = hsl_to_rgb(new_h, new_s.min(1.0), new_l);
+            (
+                r + (tinted_rgb.0 - r) * tint_strength,
+                g + (tinted_rgb.1 - g) * tint_strength,
+                b + (tinted_rgb.2 - b) * tint_strength,
+            )
+        } else {
+            (r, g, b)
+        };
+
+        // Set pixel values
+        pixel[0] = (tinted.0 * 255.0).round().max(0.0).min(255.0) as u8;
+        pixel[1] = (tinted.1 * 255.0).round().max(0.0).min(255.0) as u8;
+        pixel[2] = (tinted.2 * 255.0).round().max(0.0).min(255.0) as u8;
+        pixel[3] = original[3]; // Preserve alpha channel
+    }
+
+    adjusted_img
+}
+
+
 fn main() {
     let input_image_path: &str = "src/input.png";
     let output_image_path: &str = "src/output.png";
@@ -345,7 +522,9 @@ fn main() {
         return;
     }
 
-    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8,1.0,1.0,1.0, true) {
+
+    let color_ranges = [TintAdjustment::default()];
+    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8, 1.0, 1.0, 1.0, &color_ranges, true) {
         Ok(_) => println!("Image processing completed successfully."),
         Err(e) => println!("Error processing image: {}", e),
     }

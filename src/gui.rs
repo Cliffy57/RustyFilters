@@ -8,7 +8,7 @@ use native_dialog::FileDialog;
 use std::path::PathBuf;
 use std::fs;
 
-use crate::image_processing;
+use crate::image_processing::{self, TintAdjustment};
 use std::process::Command;
 use std::io;
 
@@ -53,6 +53,7 @@ pub struct ImageFilterApp {
     exposure: f32,
     blacks: f32,
     whites: f32,
+    tint:TintAdjustment,
     apply_grayscale: bool, 
 }
 
@@ -77,6 +78,7 @@ pub enum Message {
     ExposureChanged(f32),
     WhitesChanged(f32),
     BlacksChanged(f32),
+    TintChanged(TintAdjustment),
     ApplyGrayscale,
     MenuItemSelected(MenuItem),
 }
@@ -96,6 +98,7 @@ impl Sandbox for ImageFilterApp {
             exposure: 1.0,
             blacks:1.0,
             whites:1.0,
+            tint: TintAdjustment::default(),
             apply_grayscale: false, 
         }
     }
@@ -152,6 +155,7 @@ impl Sandbox for ImageFilterApp {
                         self.exposure,
                         self.whites,
                         self.blacks,
+                        &[self.tint],
                         self.apply_grayscale
                     ).is_ok() {
                         // Optimize the output image using ffmpeg
@@ -192,6 +196,10 @@ impl Sandbox for ImageFilterApp {
             }
             Message::BlacksChanged(blacks) => {
                 self.blacks = blacks;
+                self.update_preview();
+            }
+            Message::TintChanged(tint) => {
+                self.tint = tint;
                 self.update_preview();
             }
             Message::ApplyGrayscale => {
@@ -243,6 +251,8 @@ impl Sandbox for ImageFilterApp {
         .step(0.1);
         let whites_slider = Slider::new(0.0..=2.0, self.whites, |v| Message::WhitesChanged(v))
         .step(0.1);
+        let tint_slider = Slider::new(0.0..=360.0, self.tint.hue, |v| Message::TintChanged(TintAdjustment { hue: v, strength: self.tint.strength, preserve_gray: self.tint.preserve_gray, luminance_mask: self.tint.luminance_mask }))
+            .step(1.0);
         let grayscale_button_label = if self.apply_grayscale {
             "Remove Grayscale"
         } else {
@@ -278,6 +288,9 @@ impl Sandbox for ImageFilterApp {
                 .push(Container::new(Text::new(format!("Whites: {:.1}", self.whites)))
                     .padding(5))
                 .push(whites_slider)
+                .push(Container::new(Text::new(format!("Tint: {:?}", self.tint)))
+                    .padding(5))
+                .push(tint_slider)
                 .push(select_button)
                 .push(grayscale_button) // Add the grayscale button to the side panel
         )
@@ -390,6 +403,7 @@ impl ImageFilterApp {
                 self.exposure,
                 self.whites,
                 self.blacks,
+                &[self.tint],
                 self.apply_grayscale
             ).is_ok() {
                 match fs::read(&output_path) {
