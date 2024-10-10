@@ -1,6 +1,6 @@
 use image::{ImageBuffer, Rgba};
 use rand::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Applies various filters and effects to an input image and saves the result.
 ///
@@ -13,45 +13,59 @@ use std::path::Path;
 ///
 /// * `Result<(), Box<dyn std::error::Error>>` - Ok(()) if successful, or an error if something goes wrong.
 
-pub fn apply_filter<P: AsRef<Path>>(
-    input_path: P,
-    output_path: P,
+pub fn apply_filter(
+    input_path: &PathBuf,
+    output_path: &PathBuf,
     grain_intensity: i16,
     color_enhancement: f32,
     glow_intensity: f32,
     sharpness: f32,
-    exposure : f32, 
-    whites : f32,
-    blacks : f32,
-    tint : &[TintAdjustment],
-    apply_grayscale: bool, // New parameter to control grayscale filter
-) -> Result<(), Box<dyn std::error::Error>> {
-    let img = image::open(input_path)?;
-    let mut filtered_img = img.to_rgba8();
-
+    exposure: f32,
+    whites: f32,    // Make sure this parameter is being used
+    blacks: f32,
+    tint: &[TintAdjustment],
+    apply_grayscale: bool,
+) -> Result<(), image::ImageError> {
+    let img = image::open(input_path)?.to_rgba8();
+    
+    // Apply adjustments in the correct order
+    let mut processed = img.clone();
+    
+    // Apply exposure first
+    processed = adjust_exposure(&processed, exposure);
+    
+    // Apply whites and blacks after exposure
+    processed = adjust_whites(&processed, whites);
+    processed = adjust_blacks(&processed, blacks);
+    
+    // Then apply other effects
     if apply_grayscale {
-        filtered_img = to_grayscale(&filtered_img);
+        processed = to_grayscale(&processed);
+        img.clone();
     }
-
-    add_grain(&mut filtered_img, grain_intensity);
-    let enhanced_img = enhance_colors(&filtered_img, color_enhancement);
-    let glowed_img = add_glow(&enhanced_img, glow_intensity);
-    let exposed_img = adjust_exposure(&glowed_img, exposure);
-    let blacks_img = adjust_blacks(&exposed_img, blacks);
-    let whites_img = adjust_whites(&blacks_img, whites);
-    let tinted_img = adjust_tint(&blacks_img, &tint[0]);
-    let final_img = sharpen(&tinted_img, sharpness);
-
-    final_img.save(output_path)?;
+    
+    processed = enhance_colors(&processed, color_enhancement);
+    processed = sharpen(&processed, sharpness);
+    processed = add_glow(&processed, glow_intensity);
+    
+    // Apply tint last
+    for tint_adjustment in tint {
+        processed = adjust_tint(&processed, tint_adjustment);
+    }
+    
+    add_grain(&mut processed, grain_intensity);
+    
+    // Save the result
+    processed.save(output_path)?;
     Ok(())
 }
+
 
 /// Adds a grain effect to the image by introducing random noise.
 ///
 /// # Arguments
 ///
 /// * `img` - A mutable reference to the image buffer.
-/// * `intensity` - The intensity of the grain effect.
 fn add_grain(img: &mut ImageBuffer<Rgba<u8>, Vec<u8>>, intensity: i16) {
     let mut rng = rand::thread_rng();
     for pixel in img.pixels_mut() {
@@ -233,49 +247,37 @@ fn adjust_exposure(
 /// # Returns
 ///
 /// * An `ImageBuffer` with the whites adjusted.
-fn adjust_whites(
+pub fn adjust_whites(
     img: &ImageBuffer<Rgba<u8>, Vec<u8>>,
     adjustment: f32,
 ) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
     let (width, height) = img.dimensions();
     let mut adjusted_img: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(width, height);
 
-    // Normalize adjustment to a reasonable range
-    let adj = adjustment.max(-1.0).min(1.0);
-    
+    // Convert adjustment from 0-2 range to a more suitable range for processing
+    let processed_adjustment = (adjustment - 1.0) * 128.0; // This maps 0-2 to -128 to +128
+
     for (x, y, pixel) in adjusted_img.enumerate_pixels_mut() {
         let original = img.get_pixel(x, y);
-        
         for c in 0..3 {
-            let value = original[c] as f32 / 255.0; // Normalize to 0-1 range
+            let value = original[c] as f32;
             
-            // Apply non-linear adjustment curve
-            let adjusted = if adj > 0.0 {
-                // For positive adjustment (increasing whites)
-                let threshold = 0.5 - (adj * 0.5); // Adjustable threshold
-                if value > threshold {
-                    let factor = ((value - threshold) / (1.0 - threshold)).powf(1.0 - adj);
-                    threshold + factor * (1.0 - threshold)
-                } else {
-                    value
-                }
+            // Apply non-linear adjustment to whites
+            let adjusted = if processed_adjustment > 0.0 {
+                // Increase whites: apply more adjustment to brighter pixels
+                let factor = (value / 255.0).powf(0.5); // Non-linear factor
+                value + (processed_adjustment * factor)
             } else {
-                // For negative adjustment (decreasing whites)
-                let threshold = 0.5 + (adj.abs() * 0.5);
-                if value > threshold {
-                    let factor = ((value - threshold) / (1.0 - threshold)).powf(1.0 + adj.abs());
-                    threshold + factor * (1.0 - threshold)
-                } else {
-                    value
-                }
+                // Decrease whites: apply more adjustment to brighter pixels
+                let factor = (value / 255.0).powf(2.0); // Non-linear factor
+                value + (processed_adjustment * factor)
             };
             
-            // Convert back to u8 range
-            pixel[c] = (adjusted * 255.0).round().max(0.0).min(255.0) as u8;
+            pixel[c] = adjusted.round().max(0.0).min(255.0) as u8;
         }
         pixel[3] = original[3]; // Preserve alpha channel
     }
-    
+
     adjusted_img
 }
 
@@ -512,20 +514,21 @@ pub fn adjust_tint(
 
 
 fn main() {
-    let input_image_path: &str = "src/input.png";
-    let output_image_path: &str = "src/output.png";
+    let input_image_path = PathBuf::from("src/input.png");
+    let output_image_path = PathBuf::from("src/output.png");
 
     // Check if the input file exists
-    if !Path::new(input_image_path).exists() {
-        println!("Error: Input file '{}' not found.", input_image_path);
+    if !Path::new(&input_image_path).exists() {
+        println!("Error: Input file '{}' not found.", input_image_path.display());
         println!("Please make sure the input image is in the same directory as the executable.");
         return;
     }
 
 
     let color_ranges = [TintAdjustment::default()];
-    match apply_filter(input_image_path, output_image_path, 20, 0.5, 0.2, 0.8, 1.0, 1.0, 1.0, &color_ranges, true) {
+    match apply_filter(&input_image_path, &output_image_path, 20, 0.5, 0.2, 0.8, 1.0, 1.0, 1.0, &color_ranges, true) {
         Ok(_) => println!("Image processing completed successfully."),
         Err(e) => println!("Error processing image: {}", e),
     }
 }
+
