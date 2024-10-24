@@ -1,4 +1,4 @@
-use log::{info, error};
+use log::info;
 use env_logger::Env;
 use iced::{Application, Settings};
 

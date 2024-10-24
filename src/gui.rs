@@ -1,7 +1,7 @@
 use log::{info, error};
 use iced::{
     Alignment, Element, Length, Sandbox, Settings,
-    widget::{Button, Column, Container, Image, Text, Slider, Row, Space},
+    widget::{Button, Column, Container, Image, Text, Slider, Row},
 };
 use iced::widget::image::Handle;
 use native_dialog::FileDialog;
