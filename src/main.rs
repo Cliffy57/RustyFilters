@@ -1,18 +1,15 @@
-use log::info;
+mod app;
+mod commands;
+mod image_processing;
+mod ui;
+
 use env_logger::Env;
 use iced::{Application, Settings};
-
-mod gui;
-mod image_processing;
+use app::ImageFilterApp;
 
 fn main() -> iced::Result {
-    // Initialize the logger
-    let env = Env::default()
-        .filter_or("RUST_LOG", "info");
+    let env = Env::default().filter_or("RUST_LOG", "info");
     env_logger::init_from_env(env);
-
-    info!("Starting RustyFilters application");
-
-    // Run the application
-    gui::ImageFilterApp::run(Settings::default())
+    log::info!("Starting RustyFilters application");
+    ImageFilterApp::run(Settings::default())
 }
