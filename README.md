@@ -1,5 +1,7 @@
 # RustyFilters
 
+![RustyFilters Logo](RustyFilters.png)
+
 RustyFilters is an image processing tool written in Rust that applies various filters and effects to images.
 
 ## Features
@@ -32,6 +34,9 @@ Install `ffmpeg` using your package manager. For example, on Ubuntu, you can run
 sudo apt-get update
 sudo apt-get install ffmpeg# RustyFilters
 ```
+
+RustyFilters is an image processing tool written in Rust that applies various filters and effects to images.
+
 
 ## Features
 
@@ -85,27 +90,35 @@ This project uses Rust's built-in documentation system. To generate and view the
 
 To update the documentation, simply run the `cargo doc` command again after making changes to your code.
 
-## API Reference
+## Reference
 
-### `apply_filter`
+This project provides the following functions:
 
-Applies various filters and effects to an input image and saves the result.
-
-### `add_grain`
-
-Adds a grain effect to the image by introducing random noise.
-
-### `enhance_colors`
-
-Enhances colors using a subtle technique.
-
-### `add_glow`
-
-Adds a very subtle glow effect to the image.
-
-### `sharpen`
-
-Sharpens the image using a simple convolution kernel.
+- `add_grain`: Adds a grain effect to the image.
+- `enhance_colors`: Enhances the colors of the image.
+- `apply_glow`: Applies a subtle glow effect to the image.
+- `sharpen`: Sharpens the image.
+- `save_image`: Saves the image to the specified file path.
+- `load_image`: Loads an image from the specified file path.
+- `optimize_image`: Optimizes the size of the image using ffmpeg.
+- `process_image`: Processes the image using the specified filters.
+- `main`: The main function that runs the program.
+- `get_image_path`: Gets the path to the input image.
+- `get_output_path`: Gets the path to the output image.
+- `get_image`: Gets the image from the specified file path.
+- `get_image_dimensions`: Gets the dimensions of the image.
+- `get_image_data`: Gets the image data.
+- `set_image_data`: Sets the image data.
+- `get_pixel`: Gets the pixel at the specified coordinates.
+- `set_pixel`: Sets the pixel at the specified coordinates.
+- `clamp`: Clamps the value to the specified range.
+- `apply_filter`: Applies the specified filter to the image.
+- `apply_grain`: Applies the grain effect to the image.
+- `apply_color_enhancement`: Enhances the colors of the image.
+- `apply_glow_effect`: Applies the glow effect to the image.
+- `apply_sharpening`: Sharpens the image.
+- `apply_convolution`: Applies a convolution filter to the image.
+- `convolve`: Convolves the image with the specified kernel.
 
 For more detailed information about each function, including parameters and return types, please refer to the generated documentation.
 
@@ -115,4 +128,19 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgements
+
+- [image](https://crates.io/crates/image) - A basic image processing library.
+
+- [imageproc](https://crates.io/crates/imageproc) - A library for image processing.
+
+- [ffmpeg](https://ffmpeg.org/) - A complete, cross-platform solution to record, convert, and stream audio and video.
+
+- [Rust](https://www.rust-lang.org/) - A language empowering everyone to build reliable and efficient software.
+
+- [Cliffy57](https://github.com/Cliffy57) - The author of this project.
+
+=======
 This project is licensed under the MIT License - see the LICENSE file for details.

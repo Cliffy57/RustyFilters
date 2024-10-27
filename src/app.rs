@@ -16,6 +16,7 @@ pub struct ImageFilterApp {
     pub whites: f32,
     pub tint: TintAdjustment,
     pub apply_grayscale: bool,
+    pub(crate) show_initial_image: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -40,4 +41,5 @@ pub enum Message {
     TintChanged(TintAdjustment),
     ApplyGrayscale,
     MenuItemSelected(MenuItem),
+    ToggleImageView, // New message type
 }
