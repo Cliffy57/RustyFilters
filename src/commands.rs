@@ -50,6 +50,9 @@ pub fn handle_message(app: &mut ImageFilterApp, message: Message) {
             info!("Menu item selected: {:?}", menu_item);
             // Handle menu item selection
         }
+        Message::ToggleImageView => {
+            app.show_initial_image = !app.show_initial_image;
+        }
     }
 }
 
