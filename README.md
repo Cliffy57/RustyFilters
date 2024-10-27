@@ -141,6 +141,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Rust](https://www.rust-lang.org/) - A language empowering everyone to build reliable and efficient software.
 
 - [Cliffy57](https://github.com/Cliffy57) - The author of this project.
-
-=======
-This project is licensed under the MIT License - see the LICENSE file for details.
