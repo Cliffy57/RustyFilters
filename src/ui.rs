@@ -157,16 +157,32 @@ impl Sandbox for ImageFilterApp {
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(20)
+            .style(self.container_style())
             .into()
     }
 
+    // In ui.rs, replace the existing theme() method
     fn theme(&self) -> iced::Theme {
-        iced::Theme::default()
+        iced::Theme::custom(String::from("CustomTheme"), iced::theme::Palette {
+            background: iced::Color::from_rgb(0.15, 0.15, 0.15), // Dark background
+            text: iced::Color::from_rgb(0.9, 0.9, 0.9), // Light text
+            primary: iced::Color::from_rgb(0.4, 0.6, 1.0), // Blue accent
+            success: iced::Color::from_rgb(0.0, 0.8, 0.4), // Green
+            danger: iced::Color::from_rgb(1.0, 0.3, 0.3), // Red
+        })
     }
 
+    // Add custom styling for application
     fn style(&self) -> iced::theme::Application {
-        iced::theme::Application::default()
+        iced::theme::Application::custom(|theme: &iced::theme::Theme| {
+            iced::application::Appearance {
+                background_color: theme.palette().background,
+                text_color: theme.palette().text,
+            }
+        })
     }
+
+
 
     fn scale_factor(&self) -> f64 {
         1.0
@@ -183,6 +199,15 @@ impl Sandbox for ImageFilterApp {
 }
 
 impl ImageFilterApp {
+    fn container_style(&self) -> iced::theme::Container {
+        iced::theme::Container::Custom(Box::new(|theme: &iced::theme::Theme| {
+            iced::widget::container::Appearance {
+                background: Some(theme.palette().background.into()),
+                text_color: Some(theme.palette().text),
+                ..Default::default()
+            }
+        }))
+    }
   fn create_menu_bar(&self) -> Row<Message> {
       let file_menu = Button::new("File")
           .on_press(Message::MenuItemSelected(MenuItem::File));
