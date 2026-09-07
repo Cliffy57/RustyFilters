@@ -24,6 +24,7 @@ pub enum MenuItem {
     File,
     Edit,
     View,
+    Unload,
     Help,
 }
 

@@ -1,4 +1,4 @@
-use crate::app::{ImageFilterApp, Message};
+use crate::app::{ImageFilterApp, MenuItem, Message};
 use crate::image_processing;
 use iced::widget::image::Handle;
 use native_dialog::FileDialog;
@@ -49,6 +49,12 @@ pub fn handle_message(app: &mut ImageFilterApp, message: Message) {
         Message::MenuItemSelected(menu_item) => {
             info!("Menu item selected: {:?}", menu_item);
             // Handle menu item selection
+            // Unload the image in the software if the Unload button is clicked
+            if matches!(menu_item, MenuItem::Unload) {
+                app.input_path = None;
+                app. image_handle = None;
+                app.filtered_image_handle = None;
+            }
         }
         Message::ToggleImageView => {
             app.show_initial_image = !app.show_initial_image;

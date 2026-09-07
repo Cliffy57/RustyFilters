@@ -217,6 +217,9 @@ impl ImageFilterApp {
       
       let view_menu = Button::new("View")
           .on_press(Message::MenuItemSelected(MenuItem::View));
+
+      let unload_menu = Button::new("Unload")
+          .on_press(Message::MenuItemSelected(MenuItem::Unload));
       
       let help_menu = Button::new("Help")
           .on_press(Message::MenuItemSelected(MenuItem::Help));
@@ -226,6 +229,7 @@ impl ImageFilterApp {
           .push(file_menu)
           .push(edit_menu)
           .push(view_menu)
+          .push(unload_menu)
           .push(help_menu)
   }
 
